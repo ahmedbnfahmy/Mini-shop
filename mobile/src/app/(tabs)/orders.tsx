@@ -1,10 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { api } from '../../services/api';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
+import { api } from '../../../services/api';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     fetchOrders();
@@ -24,19 +34,36 @@ export default function OrdersScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return { bg: '#fef3c7', text: '#92400e' };
-      case 'processing': return { bg: '#dbeafe', text: '#1e40af' };
-      case 'completed': return { bg: '#d1fae5', text: '#065f46' };
-      case 'cancelled': return { bg: '#fee2e2', text: '#b91c1c' };
-      default: return { bg: '#f3f4f6', text: '#374151' };
+      case 'pending':
+        return { bg: '#fef3c7', text: '#92400e' };
+      case 'processing':
+        return { bg: '#dbeafe', text: '#1e40af' };
+      case 'completed':
+        return { bg: '#d1fae5', text: '#065f46' };
+      case 'cancelled':
+        return { bg: '#fee2e2', text: '#b91c1c' };
+      default:
+        return { bg: '#f3f4f6', text: '#374151' };
     }
+  };
+
+  const openOrderDetail = (order: any) => {
+    router.push({
+      pathname: '/order-detail',
+      params: { order: JSON.stringify(order) },
+    });
   };
 
   const renderItem = ({ item }: { item: any }) => {
     const statusColors = getStatusColor(item.status);
-    
+    const itemCount = item.order_items?.length ?? 0;
+
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => openOrderDetail(item)}
+        activeOpacity={0.7}
+      >
         <View style={styles.header}>
           <Text style={styles.orderId}>Order #{item.id.split('-')[0]}</Text>
           <View style={[styles.badge, { backgroundColor: statusColors.bg }]}>
@@ -45,7 +72,7 @@ export default function OrdersScreen() {
             </Text>
           </View>
         </View>
-        
+
         <View style={styles.details}>
           <Text style={styles.date}>
             {new Date(item.created_at).toLocaleDateString()}
@@ -55,14 +82,13 @@ export default function OrdersScreen() {
           </Text>
         </View>
 
-        <View style={styles.itemsList}>
-          {item.order_items?.map((orderItem: any, idx: number) => (
-            <Text key={idx} style={styles.itemText} numberOfLines={1}>
-              {orderItem.quantity}x {orderItem.products?.name}
-            </Text>
-          ))}
+        <View style={styles.footer}>
+          <Text style={styles.tapHint}>
+            {itemCount} item{itemCount !== 1 ? 's' : ''} · Tap for details
+          </Text>
+          <ChevronRight size={18} color="#9ca3af" />
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -81,7 +107,9 @@ export default function OrdersScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Text style={styles.emptyText}>You haven't placed any orders yet.</Text>
+              <Text style={styles.emptyText}>
+                You haven't placed any orders yet.
+              </Text>
             </View>
           }
         />
@@ -149,12 +177,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#111827',
   },
-  itemsList: {
-    gap: 4,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  itemText: {
-    fontSize: 14,
-    color: '#4b5563',
+  tapHint: {
+    fontSize: 13,
+    color: '#6b7280',
   },
   center: {
     flex: 1,

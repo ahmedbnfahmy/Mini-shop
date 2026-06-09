@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
 import { Search } from 'lucide-react-native';
-import { api } from '../../services/api';
-import { Product, useCartStore } from '../../store/cartStore';
+import { api } from '../../../services/api';
+import { Product, useCartStore } from '../../../store/cartStore';
 
 export default function ShopScreen() {
   const [products, setProducts] = useState<Product[]>([]);

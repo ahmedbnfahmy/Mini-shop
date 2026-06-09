@@ -1,4 +1,6 @@
-import * as SecureStore from 'expo-secure-store';
+import { getItem } from '../utils/storage';
+import { isTokenExpired } from '../utils/token';
+import { useAuthStore } from '../store/authStore';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -15,7 +17,13 @@ class ApiError extends Error {
 }
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-  const token = await SecureStore.getItemAsync('user_token');
+  const token = await getItem('user_token');
+
+  if (token && isTokenExpired(token)) {
+    await useAuthStore.getState().handleSessionExpired();
+    throw new ApiError(401, 'Unauthorized', 'Session expired. Please log in again.');
+  }
+
   const headers = new Headers(options.headers || {});
   
   if (token) {
@@ -40,9 +48,8 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     }
 
     if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
-        // Trigger a custom event or callback to logout the user in the app layout
-        // For simplicity, authStore will handle token expiration locally
+      if (response.status === 401) {
+        await useAuthStore.getState().handleSessionExpired();
       }
       throw new ApiError(
         data?.statusCode || response.status,

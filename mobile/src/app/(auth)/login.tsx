@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Store, Mail, Lock } from 'lucide-react-native';
-import { api } from '../../services/api';
-import { useAuthStore } from '../../store/authStore';
+import { api } from '../../../services/api';
+import { useAuthStore } from '../../../store/authStore';
 // Standard imports
 import { SafeAreaView } from 'react-native-safe-area-context';
 

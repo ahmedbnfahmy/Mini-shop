@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Minus, Plus, Trash2 } from 'lucide-react-native';
-import { CartItem, useCartStore } from '../../store/cartStore';
-import { api } from '../../services/api';
+import { CartItem, useCartStore } from '../../../store/cartStore';
+import { api } from '../../../services/api';
 import { useRouter } from 'expo-router';
 
 export default function CartScreen() {
@@ -21,11 +21,17 @@ export default function CartScreen() {
         quantity: item.quantity
       }));
 
-      await api.post('/orders', { items: orderItems });
+      const res = await api.post('/orders', { items: orderItems });
+      const order = res.order;
       clearCart();
-      Alert.alert('Success', 'Your order has been placed successfully!', [
-        { text: 'View Orders', onPress: () => router.push('/(tabs)/orders') }
-      ]);
+      router.push({
+        pathname: '/order-confirmation',
+        params: {
+          orderId: order.id,
+          total: String(order.total_amount),
+          itemCount: String(items.reduce((sum, i) => sum + i.quantity, 0)),
+        },
+      });
     } catch (err: any) {
       Alert.alert('Checkout Failed', err.message || 'Something went wrong.');
     } finally {

@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { ShoppingBag, ShoppingCart, Clock, User } from 'lucide-react-native';
-import { useCartStore } from '../../store/cartStore';
+import { useCartStore } from '../../../store/cartStore';
 import { View, Text } from 'react-native';
 
 export default function TabLayout() {
