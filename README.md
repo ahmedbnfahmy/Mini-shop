@@ -2,6 +2,10 @@
 
 This is a comprehensive full-stack solution built for the Mini Shop Developer Task.
 
+## Video Walkthrough
+
+Watch the full demo (4–5 min): [Mini Shop Walkthrough on Google Drive](https://drive.google.com/file/d/1POjExvboExzj7_05vlHw6YyHWMGAYpZw/view?usp=drive_link)
+
 ## Projects
 
 1. **Backend API** (`/backend`)
