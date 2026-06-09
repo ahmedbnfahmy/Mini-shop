@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { supabaseAdmin } from '../../plugins/supabase.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { authorize } from '../../middleware/authorize.js';
+import { optionalAuthenticate } from '../../middleware/optionalAuthenticate.js';
 import {
   createProductSchema,
   updateProductSchema,
@@ -9,18 +10,41 @@ import {
 } from '../../schemas/product.schema.js';
 
 export async function productRoutes(fastify: FastifyInstance): Promise<void> {
-  // GET /products — List active products (public, with search & category filter)
-  fastify.get('/', async (request, reply) => {
+  // GET /products/categories — List all categories (public helper)
+  fastify.get('/categories', async (_request, reply) => {
+    const { data, error } = await supabaseAdmin
+      .from('categories')
+      .select('*')
+      .order('name');
+
+    if (error) {
+      return reply.code(500).send({
+        statusCode: 500,
+        error: 'Database Error',
+        message: error.message,
+      });
+    }
+
+    return reply.send({ categories: data });
+  });
+
+  // GET /products — List products (public: active only; admin: all when include_inactive=true)
+  fastify.get('/', { preHandler: [optionalAuthenticate] }, async (request, reply) => {
     const query = productQuerySchema.parse(request.query);
-    const { search, category, page, limit } = query;
+    const { search, category, page, limit, include_inactive } = query;
     const offset = (page - 1) * limit;
+    const showInactive =
+      include_inactive === true && request.userRole === 'admin';
 
     let queryBuilder = supabaseAdmin
       .from('products')
       .select('*, categories(name, slug)', { count: 'exact' })
-      .eq('is_active', true)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    if (!showInactive) {
+      queryBuilder = queryBuilder.eq('is_active', true);
+    }
 
     // Apply text search
     if (search) {
@@ -53,7 +77,7 @@ export async function productRoutes(fastify: FastifyInstance): Promise<void> {
       });
     }
 
-    return reply.send({
+    const response: Record<string, unknown> = {
       products: data,
       pagination: {
         page,
@@ -61,7 +85,27 @@ export async function productRoutes(fastify: FastifyInstance): Promise<void> {
         total: count || 0,
         totalPages: Math.ceil((count || 0) / limit),
       },
-    });
+    };
+
+    if (showInactive) {
+      const [{ count: activeCount }, { count: inactiveCount }] = await Promise.all([
+        supabaseAdmin
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true),
+        supabaseAdmin
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', false),
+      ]);
+      response.stats = {
+        total: (activeCount || 0) + (inactiveCount || 0),
+        active: activeCount || 0,
+        inactive: inactiveCount || 0,
+      };
+    }
+
+    return reply.send(response);
   });
 
   // GET /products/:id — Single product detail (public)
@@ -182,21 +226,4 @@ export async function productRoutes(fastify: FastifyInstance): Promise<void> {
     }
   );
 
-  // GET /products/categories — List all categories (public helper)
-  fastify.get('/categories', async (_request, reply) => {
-    const { data, error } = await supabaseAdmin
-      .from('categories')
-      .select('*')
-      .order('name');
-
-    if (error) {
-      return reply.code(500).send({
-        statusCode: 500,
-        error: 'Database Error',
-        message: error.message,
-      });
-    }
-
-    return reply.send({ categories: data });
-  });
 }

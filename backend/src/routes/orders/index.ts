@@ -166,6 +166,18 @@ export async function orderRoutes(fastify: FastifyInstance): Promise<void> {
         });
       }
 
+      const statusCounts = await Promise.all(
+        (['pending', 'processing', 'completed', 'cancelled'] as const).map(
+          async (s) => {
+            const { count: statusCount } = await supabaseAdmin
+              .from('orders')
+              .select('*', { count: 'exact', head: true })
+              .eq('status', s);
+            return [s, statusCount || 0] as const;
+          }
+        )
+      );
+
       return reply.send({
         orders: data,
         pagination: {
@@ -174,6 +186,7 @@ export async function orderRoutes(fastify: FastifyInstance): Promise<void> {
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
         },
+        stats: Object.fromEntries(statusCounts),
       });
     }
   );

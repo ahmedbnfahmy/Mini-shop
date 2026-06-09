@@ -9,7 +9,7 @@ export function authorize(...allowedRoles: string[]) {
     reply: FastifyReply
   ): Promise<void> {
     if (!request.userRole || !allowedRoles.includes(request.userRole)) {
-      reply.code(403).send({
+      return reply.code(403).send({
         statusCode: 403,
         error: 'Forbidden',
         message: 'You do not have permission to access this resource',

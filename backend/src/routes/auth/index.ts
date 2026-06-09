@@ -6,14 +6,56 @@ import {
   loginSchema,
   forgotPasswordSchema,
 } from '../../schemas/auth.schema.js';
+import {
+  findUserByEmail,
+  getProfileRole,
+  mapAuthErrorMessage,
+} from '../../utils/auth-helpers.js';
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
-  // POST /auth/register
+  // POST /auth/register — customer app only, always creates customer role
   fastify.post('/register', async (request, reply) => {
     const body = registerSchema.parse(request.body);
+    const email = body.email.trim().toLowerCase();
+
+    try {
+      const existingUser = await findUserByEmail(email);
+
+      if (existingUser) {
+        const role =
+          (await getProfileRole(existingUser.id)) ??
+          (existingUser.user_metadata?.role as string | undefined) ??
+          'customer';
+
+        if (role === 'admin') {
+          return reply.code(403).send({
+            statusCode: 403,
+            error: 'Registration Not Allowed',
+            message:
+              'This email is registered as an administrator. Admin accounts cannot be created from the customer app.',
+          });
+        }
+
+        return reply.code(409).send({
+          statusCode: 409,
+          error: 'Email Already Exists',
+          message:
+            'An account with this email already exists. Please sign in instead.',
+        });
+      }
+    } catch (err) {
+      return reply.code(500).send({
+        statusCode: 500,
+        error: 'Registration Failed',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Failed to verify email availability',
+      });
+    }
 
     const { data, error } = await supabaseAuth.auth.signUp({
-      email: body.email,
+      email,
       password: body.password,
       options: {
         data: {
@@ -27,7 +69,17 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       return reply.code(400).send({
         statusCode: 400,
         error: 'Registration Failed',
-        message: error.message,
+        message: mapAuthErrorMessage(error.message),
+      });
+    }
+
+    // Supabase may return a user with no identities when email already exists
+    if (data.user && data.user.identities?.length === 0) {
+      return reply.code(409).send({
+        statusCode: 409,
+        error: 'Email Already Exists',
+        message:
+          'An account with this email already exists. Please sign in instead.',
       });
     }
 
@@ -36,6 +88,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       user: {
         id: data.user?.id,
         email: data.user?.email,
+        role: 'customer',
       },
       session: data.session,
     });

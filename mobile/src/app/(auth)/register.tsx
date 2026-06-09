@@ -1,33 +1,67 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Store, Mail, Lock } from 'lucide-react-native';
-import { api } from '../../../services/api';
-import { useAuthStore } from '../../../store/authStore';
-// Standard imports
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { Store, Mail, Lock, User } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { api } from '../../../services/api';
 
-export default function LoginScreen() {
-  const { email: emailParam } = useLocalSearchParams<{ email?: string }>();
-  const [email, setEmail] = useState(emailParam ?? '');
+export default function RegisterScreen() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuthStore();
   const router = useRouter();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password.');
+  const handleRegister = async () => {
+    if (!name.trim() || !email || !password) {
+      Alert.alert('Error', 'Please fill in all fields.');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters.');
       return;
     }
 
     try {
       setLoading(true);
-      const data = await api.post('/auth/login', { email, password });
-      await login(data.user, data.session.access_token);
-      router.replace('/(tabs)');
+      await api.post('/auth/register', {
+        name: name.trim(),
+        email,
+        password,
+      });
+
+      Alert.alert(
+        'Registration successful',
+        'Your account has been created. Please sign in to continue.',
+        [
+          {
+            text: 'OK',
+            onPress: () =>
+              router.replace({
+                pathname: '/(auth)/login',
+                params: { email },
+              }),
+          },
+        ]
+      );
     } catch (err: any) {
-      Alert.alert('Login Failed', err.message || 'Please check your credentials.');
+      const title =
+        err.statusCode === 409
+          ? 'Email Already Exists'
+          : err.statusCode === 403
+            ? 'Registration Not Allowed'
+            : 'Registration Failed';
+      Alert.alert(title, err.message || 'Could not create account.');
     } finally {
       setLoading(false);
     }
@@ -35,16 +69,27 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <View style={styles.iconContainer}>
             <Store size={32} color="#ffffff" />
           </View>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to your Mini Shop account</Text>
+          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.subtitle}>Join Mini Shop and start shopping</Text>
         </View>
 
         <View style={styles.form}>
+          <View style={styles.inputContainer}>
+            <User size={20} color="#9ca3af" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+            />
+          </View>
+
           <View style={styles.inputContainer}>
             <Mail size={20} color="#9ca3af" style={styles.inputIcon} />
             <TextInput
@@ -61,7 +106,7 @@ export default function LoginScreen() {
             <Lock size={20} color="#9ca3af" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder="Password (min. 6 characters)"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -69,34 +114,27 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            style={styles.forgotBtn}
-            onPress={() => router.push('/(auth)/forgot-password')}
-          >
-            <Text style={styles.forgotText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleLogin}
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleRegister}
             disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>Create Account</Text>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.linkBtn}
-            onPress={() => router.push('/(auth)/register')}
+            onPress={() => router.replace('/(auth)/login')}
           >
             <Text style={styles.linkText}>
-              Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
+              Already have an account? <Text style={styles.linkBold}>Sign In</Text>
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -107,13 +145,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 40,
   },
   iconContainer: {
     width: 64,
@@ -123,11 +161,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   title: {
     fontSize: 28,
@@ -138,6 +171,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#6b7280',
+    textAlign: 'center',
   },
   form: {
     gap: 16,
@@ -168,11 +202,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -181,14 +210,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  forgotBtn: {
-    alignSelf: 'flex-end',
-  },
-  forgotText: {
-    fontSize: 14,
-    color: '#2563eb',
-    fontWeight: '500',
   },
   linkBtn: {
     alignItems: 'center',

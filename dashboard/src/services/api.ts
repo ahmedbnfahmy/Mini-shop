@@ -21,7 +21,12 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     headers.set('Authorization', `Bearer ${token}`);
   }
   
-  if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
+  const hasBody = options.body != null && options.body !== '';
+  if (
+    hasBody &&
+    !headers.has('Content-Type') &&
+    !(options.body instanceof FormData)
+  ) {
     headers.set('Content-Type', 'application/json');
   }
 

@@ -20,10 +20,24 @@ async function buildServer() {
     },
   });
 
+  // Allow empty body on DELETE/GET when Content-Type is application/json
+  fastify.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (_req, body, done) => {
+      try {
+        done(null, body ? JSON.parse(body as string) : {});
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    }
+  );
+
   // CORS
   await fastify.register(cors, {
     origin: true, // Allow all origins in development
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   // Global error handler

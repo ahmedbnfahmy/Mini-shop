@@ -21,6 +21,10 @@ export const updateProductSchema = z.object({
 export const productQuerySchema = z.object({
   search: z.string().optional(),
   category: z.string().optional(),
+  include_inactive: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
 });
