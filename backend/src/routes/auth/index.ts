@@ -54,14 +54,13 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       });
     }
 
-    const { data, error } = await supabaseAuth.auth.signUp({
+    const { data: user, error } = await supabaseAuth.auth.admin.createUser({
       email,
       password: body.password,
-      options: {
-        data: {
-          name: body.name,
-          role: 'customer',
-        },
+      email_confirm: true,
+      user_metadata: {
+        name: body.name,
+        role: 'customer',
       },
     });
 
@@ -73,24 +72,13 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
       });
     }
 
-    // Supabase may return a user with no identities when email already exists
-    if (data.user && data.user.identities?.length === 0) {
-      return reply.code(409).send({
-        statusCode: 409,
-        error: 'Email Already Exists',
-        message:
-          'An account with this email already exists. Please sign in instead.',
-      });
-    }
-
     return reply.code(201).send({
       message: 'Registration successful',
       user: {
-        id: data.user?.id,
-        email: data.user?.email,
+        id: user.user.id,
+        email: user.user.email,
         role: 'customer',
       },
-      session: data.session,
     });
   });
 
@@ -98,16 +86,39 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/login', async (request, reply) => {
     const body = loginSchema.parse(request.body);
 
-    const { data, error } = await supabaseAuth.auth.signInWithPassword({
-      email: body.email,
+    const email = body.email.trim().toLowerCase();
+    let { data, error } = await supabaseAuth.auth.signInWithPassword({
+      email,
       password: body.password,
     });
 
-    if (error) {
+    if (
+      error?.message?.toLowerCase().includes('email not confirmed')
+    ) {
+      const existingUser = await findUserByEmail(email);
+      const role =
+        existingUser &&
+        ((await getProfileRole(existingUser.id)) ??
+          (existingUser.user_metadata?.role as string | undefined));
+
+      if (existingUser && role !== 'admin') {
+        await supabaseAuth.auth.admin.updateUserById(existingUser.id, {
+          email_confirm: true,
+        });
+        const retry = await supabaseAuth.auth.signInWithPassword({
+          email,
+          password: body.password,
+        });
+        data = retry.data;
+        error = retry.error;
+      }
+    }
+
+    if (error || !data.user || !data.session) {
       return reply.code(401).send({
         statusCode: 401,
         error: 'Authentication Failed',
-        message: error.message,
+        message: mapAuthErrorMessage(error?.message ?? 'Login failed'),
       });
     }
 

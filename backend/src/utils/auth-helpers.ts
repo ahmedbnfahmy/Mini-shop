@@ -35,6 +35,12 @@ export function mapAuthErrorMessage(message: string): string {
   if (lower.includes('already registered') || lower.includes('already exists')) {
     return 'An account with this email already exists. Please sign in instead.';
   }
+  if (lower.includes('email not confirmed')) {
+    return 'Your email is not confirmed yet. Please try again in a moment or contact support.';
+  }
+  if (lower.includes('invalid login credentials')) {
+    return 'Invalid email or password. Please try again.';
+  }
 
   return message;
 }

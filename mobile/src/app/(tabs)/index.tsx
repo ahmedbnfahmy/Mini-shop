@@ -1,58 +1,131 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
-import { Search } from 'lucide-react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  TextInput,
+} from 'react-native';
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { api } from '../../../services/api';
 import { Product, useCartStore } from '../../../store/cartStore';
+
+const PAGE_SIZE = 10;
 
 export default function ShopScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
   const { addItem } = useCartStore();
+  const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const fetchProducts = async () => {
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/products?limit=50');
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+
+      const res = await api.get(`/products?${params}`);
       setProducts(res.products);
+      setPagination(res.pagination);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch]);
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase()) || 
-    (p.categories?.name || '').toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > pagination.totalPages) return;
+    setPage(nextPage);
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
 
   const renderProduct = ({ item }: { item: Product }) => (
     <View style={styles.card}>
-      <Image 
-        source={{ uri: item.image_url || 'https://via.placeholder.com/150' }} 
+      <Image
+        source={{ uri: item.image_url || 'https://via.placeholder.com/150' }}
         style={styles.image}
         resizeMode="cover"
       />
       <View style={styles.cardInfo}>
-        <Text style={styles.category} numberOfLines={1}>{item.categories?.name || 'Uncategorized'}</Text>
-        <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.category} numberOfLines={1}>
+          {item.categories?.name || 'Uncategorized'}
+        </Text>
+        <Text style={styles.name} numberOfLines={2}>
+          {item.name}
+        </Text>
         <View style={styles.footer}>
           <Text style={styles.price}>${Number(item.price).toFixed(2)}</Text>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => addItem(item)}
-          >
+          <TouchableOpacity style={styles.addButton} onPress={() => addItem(item)}>
             <Text style={styles.addButtonText}>Add</Text>
           </TouchableOpacity>
         </View>
       </View>
     </View>
   );
+
+  const from = pagination.total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, pagination.total);
+
+  const renderPagination = () => {
+    if (pagination.total === 0) return null;
+
+    return (
+      <View style={styles.pagination}>
+        <Text style={styles.paginationInfo}>
+          {from}–{to} of {pagination.total}
+        </Text>
+        <View style={styles.paginationControls}>
+          <TouchableOpacity
+            style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+            onPress={() => handlePageChange(page - 1)}
+            disabled={page <= 1}
+          >
+            <ChevronLeft size={20} color={page <= 1 ? '#d1d5db' : '#374151'} />
+          </TouchableOpacity>
+          <Text style={styles.pageText}>
+            Page {page} of {pagination.totalPages}
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.pageBtn,
+              page >= pagination.totalPages && styles.pageBtnDisabled,
+            ]}
+            onPress={() => handlePageChange(page + 1)}
+            disabled={page >= pagination.totalPages}
+          >
+            <ChevronRight
+              size={20}
+              color={page >= pagination.totalPages ? '#d1d5db' : '#374151'}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -72,7 +145,8 @@ export default function ShopScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredProducts}
+          ref={listRef}
+          data={products}
           keyExtractor={(item) => item.id}
           renderItem={renderProduct}
           numColumns={2}
@@ -84,6 +158,7 @@ export default function ShopScreen() {
               <Text style={styles.emptyText}>No products found.</Text>
             </View>
           }
+          ListFooterComponent={renderPagination}
         />
       )}
     </View>
@@ -117,6 +192,7 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingTop: 0,
+    flexGrow: 1,
   },
   columnWrapper: {
     justifyContent: 'space-between',
@@ -186,5 +262,41 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#6b7280',
     fontSize: 16,
+  },
+  pagination: {
+    marginTop: 8,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    alignItems: 'center',
+    gap: 12,
+  },
+  paginationInfo: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  paginationControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pageBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pageBtnDisabled: {
+    opacity: 0.5,
+  },
+  pageText: {
+    fontSize: 14,
+    color: '#374151',
+    minWidth: 100,
+    textAlign: 'center',
   },
 });
