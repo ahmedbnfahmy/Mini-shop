@@ -119,7 +119,7 @@ export async function orderRoutes(fastify: FastifyInstance): Promise<void> {
 
       const { data, error } = await supabaseAdmin
         .from('orders')
-        .select('*, order_items(*, products(name, image_url, price))')
+        .select('*, order_items(*, products(name, description, image_url, price))')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 

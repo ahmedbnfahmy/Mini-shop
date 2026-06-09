@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,19 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Package } from 'lucide-react-native';
+import { api } from '../../services/api';
 
 interface OrderItem {
   quantity: number;
   unit_price: number;
   products?: {
     name: string;
+    description?: string;
     image_url?: string;
     price?: number;
   };
@@ -46,16 +49,51 @@ function getStatusColor(status: string) {
 
 export default function OrderDetailScreen() {
   const router = useRouter();
-  const { order: orderParam } = useLocalSearchParams<{ order: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
-  let order: Order | null = null;
-  try {
-    order = orderParam ? JSON.parse(orderParam) : null;
-  } catch {
-    order = null;
+  const fetchOrder = useCallback(async () => {
+    if (!id) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setNotFound(false);
+      const res = await api.get('/orders/my');
+      const found = res.orders.find((o: Order) => o.id === id) ?? null;
+      setOrder(found);
+      setNotFound(!found);
+    } catch (err) {
+      console.error(err);
+      setOrder(null);
+      setNotFound(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrder();
+    }, [fetchOrder])
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#2563eb" />
+        </View>
+      </SafeAreaView>
+    );
   }
 
-  if (!order) {
+  if (!order || notFound) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
@@ -118,6 +156,11 @@ export default function OrderDetailScreen() {
                 <Text style={styles.itemName} numberOfLines={2}>
                   {item.products?.name || 'Unknown Product'}
                 </Text>
+                {item.products?.description ? (
+                  <Text style={styles.itemDescription} numberOfLines={3}>
+                    {item.products.description}
+                  </Text>
+                ) : null}
                 <Text style={styles.itemMeta}>
                   ${parseFloat(String(item.unit_price)).toFixed(2)} × {item.quantity}
                 </Text>
@@ -249,6 +292,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
     marginBottom: 4,
+  },
+  itemDescription: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 18,
+    marginBottom: 6,
   },
   itemMeta: {
     fontSize: 13,

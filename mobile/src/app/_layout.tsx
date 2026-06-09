@@ -1,5 +1,6 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
 
 export default function RootLayout() {
@@ -30,11 +31,13 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="order-confirmation" options={{ headerShown: false }} />
-      <Stack.Screen name="order-detail" options={{ headerShown: false }} />
-    </Stack>
+    <SafeAreaProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="order-confirmation" options={{ headerShown: false }} />
+        <Stack.Screen name="order-detail" options={{ headerShown: false }} />
+      </Stack>
+    </SafeAreaProvider>
   );
 }
