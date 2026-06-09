@@ -1,0 +1,66 @@
+import * as SecureStore from 'expo-secure-store';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+class ApiError extends Error {
+  statusCode: number;
+  error: string;
+
+  constructor(statusCode: number, error: string, message: string) {
+    super(message);
+    this.statusCode = statusCode;
+    this.error = error;
+    this.name = 'ApiError';
+  }
+}
+
+async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+  const token = await SecureStore.getItemAsync('user_token');
+  const headers = new Headers(options.headers || {});
+  
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        // Trigger a custom event or callback to logout the user in the app layout
+        // For simplicity, authStore will handle token expiration locally
+      }
+      throw new ApiError(
+        data?.statusCode || response.status,
+        data?.error || 'Unknown Error',
+        data?.message || 'An error occurred during the API request.'
+      );
+    }
+
+    return data;
+  } catch (error: any) {
+    if (error instanceof ApiError) throw error;
+    throw new Error('Network error. Please try again.');
+  }
+}
+
+export const api = {
+  get: (endpoint: string, options?: RequestInit) => fetchWithAuth(endpoint, { ...options, method: 'GET' }),
+  post: (endpoint: string, data: any, options?: RequestInit) => fetchWithAuth(endpoint, { ...options, method: 'POST', body: JSON.stringify(data) }),
+  patch: (endpoint: string, data: any, options?: RequestInit) => fetchWithAuth(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (endpoint: string, options?: RequestInit) => fetchWithAuth(endpoint, { ...options, method: 'DELETE' }),
+};
