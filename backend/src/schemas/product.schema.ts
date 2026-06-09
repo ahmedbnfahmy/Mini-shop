@@ -21,6 +21,7 @@ export const updateProductSchema = z.object({
 export const productQuerySchema = z.object({
   search: z.string().optional(),
   category: z.string().optional(),
+  status: z.enum(['active', 'inactive']).optional(),
   include_inactive: z
     .enum(['true', 'false'])
     .optional()

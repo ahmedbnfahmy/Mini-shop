@@ -27,17 +27,23 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('');
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
   const [stats, setStats] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchOrders();
-  }, [page]);
+  }, [page, statusFilter]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/orders?page=${page}&limit=${PAGE_SIZE}`);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      });
+      if (statusFilter) params.set('status', statusFilter);
+      const res = await api.get(`/orders?${params}`);
       setOrders(res.orders);
       setPagination(res.pagination);
       if (res.stats) setStats(res.stats);
@@ -102,6 +108,23 @@ export function OrdersPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <p className="text-sm text-gray-500">Filter by status</p>
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-w-[180px]"
+          >
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

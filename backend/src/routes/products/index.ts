@@ -31,7 +31,7 @@ export async function productRoutes(fastify: FastifyInstance): Promise<void> {
   // GET /products — List products (public: active only; admin: all when include_inactive=true)
   fastify.get('/', { preHandler: [optionalAuthenticate] }, async (request, reply) => {
     const query = productQuerySchema.parse(request.query);
-    const { search, category, page, limit, include_inactive } = query;
+    const { search, category, status, page, limit, include_inactive } = query;
     const offset = (page - 1) * limit;
     const showInactive =
       include_inactive === true && request.userRole === 'admin';
@@ -42,8 +42,10 @@ export async function productRoutes(fastify: FastifyInstance): Promise<void> {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (!showInactive) {
+    if (!showInactive || status === 'active') {
       queryBuilder = queryBuilder.eq('is_active', true);
+    } else if (status === 'inactive') {
+      queryBuilder = queryBuilder.eq('is_active', false);
     }
 
     // Apply text search
