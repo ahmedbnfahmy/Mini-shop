@@ -1,22 +1,36 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
-export function ProtectedRoute({ children, adminOnly = true }: { children: React.ReactNode, adminOnly?: boolean }) {
-  const { isAuthenticated, user } = useAuth();
+export function ProtectedRoute({
+  children,
+  adminOnly = true,
+}: {
+  children: React.ReactNode;
+  adminOnly?: boolean;
+}) {
+  const { isAuthenticated, isInitializing, user } = useAuth();
   const location = useLocation();
+
+  if (isInitializing) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (adminOnly && user?.role !== 'admin') {
-    // If not admin, you shouldn't be here
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50 text-gray-900">
         <div className="p-8 max-w-sm w-full bg-white shadow rounded-xl text-center">
           <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
           <p className="mb-6">You need administrator privileges to access this dashboard.</p>
-          <button 
+          <button
             onClick={() => {
               localStorage.removeItem('admin_token');
               localStorage.removeItem('admin_user');

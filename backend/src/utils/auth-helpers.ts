@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../plugins/supabase.js';
+import { supabaseAdmin, supabaseAuth } from '../plugins/supabase.js';
 
 export async function findUserByEmail(email: string) {
   const normalized = email.trim().toLowerCase();
@@ -24,6 +24,31 @@ export async function getProfileRole(userId: string): Promise<string | null> {
     .single();
 
   return data?.role ?? null;
+}
+
+export async function promoteUserToAdmin(
+  userId: string,
+  name: string
+): Promise<void> {
+  const { error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .update({ role: 'admin', name })
+    .eq('id', userId);
+
+  if (profileError) {
+    throw new Error('Failed to update user profile');
+  }
+
+  const { error: authError } = await supabaseAuth.auth.admin.updateUserById(
+    userId,
+    {
+      user_metadata: { name, role: 'admin' },
+    }
+  );
+
+  if (authError) {
+    throw new Error('Failed to update user role');
+  }
 }
 
 export function mapAuthErrorMessage(message: string): string {

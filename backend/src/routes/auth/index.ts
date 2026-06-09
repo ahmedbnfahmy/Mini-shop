@@ -10,6 +10,7 @@ import {
   findUserByEmail,
   getProfileRole,
   mapAuthErrorMessage,
+  promoteUserToAdmin,
 } from '../../utils/auth-helpers.js';
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
@@ -80,6 +81,96 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         role: 'customer',
       },
     });
+  });
+
+  // POST /auth/register/admin — dashboard only, creates or promotes to admin role
+  fastify.post('/register/admin', async (request, reply) => {
+    const body = registerSchema.parse(request.body);
+    const email = body.email.trim().toLowerCase();
+
+    try {
+      const existingUser = await findUserByEmail(email);
+
+      if (existingUser) {
+        const role =
+          (await getProfileRole(existingUser.id)) ??
+          (existingUser.user_metadata?.role as string | undefined) ??
+          'customer';
+
+        if (role === 'admin') {
+          return reply.code(409).send({
+            statusCode: 409,
+            error: 'Email Already Exists',
+            message:
+              'An admin account with this email already exists. Please sign in instead.',
+          });
+        }
+
+        const { error: signInError } =
+          await supabaseAuth.auth.signInWithPassword({
+            email,
+            password: body.password,
+          });
+
+        if (signInError) {
+          return reply.code(401).send({
+            statusCode: 401,
+            error: 'Promotion Failed',
+            message:
+              'This email is already registered as a customer. Enter the correct password to upgrade this account to admin.',
+          });
+        }
+
+        await promoteUserToAdmin(existingUser.id, body.name);
+
+        return reply.send({
+          message: 'Account upgraded to administrator successfully',
+          user: {
+            id: existingUser.id,
+            email: existingUser.email,
+            name: body.name,
+            role: 'admin',
+          },
+        });
+      }
+
+      const { data: user, error } = await supabaseAuth.auth.admin.createUser({
+        email,
+        password: body.password,
+        email_confirm: true,
+        user_metadata: {
+          name: body.name,
+          role: 'admin',
+        },
+      });
+
+      if (error) {
+        return reply.code(400).send({
+          statusCode: 400,
+          error: 'Registration Failed',
+          message: mapAuthErrorMessage(error.message),
+        });
+      }
+
+      return reply.code(201).send({
+        message: 'Admin registration successful',
+        user: {
+          id: user.user.id,
+          email: user.user.email,
+          name: body.name,
+          role: 'admin',
+        },
+      });
+    } catch (err) {
+      return reply.code(500).send({
+        statusCode: 500,
+        error: 'Registration Failed',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Failed to complete admin registration',
+      });
+    }
   });
 
   // POST /auth/login
